@@ -269,12 +269,6 @@
 </head>
 <body>
 
-<div class="page-header">
-  <div class="eyebrow">Comparative Analysis · Synthesis Technology</div>
-</div>
-
-<div class="hover-hint" id="hover-hint">▸ &nbsp; hover a panel to focus</div>
-
 <div class="panels" id="panels">
 
   <!-- SPDS Panel -->
@@ -285,7 +279,7 @@
     <div class="scale-wrap" id="wrap-spds">
       <iframe
         id="iframe-spds"
-        src="https://nanosynth-llc.github.io/nanobot_synthesis/spds_animation1.html"
+        src="SPDS_URL_HERE"
         scrolling="no"
         title="Solid-Phase DNA Synthesis">
       </iframe>
@@ -300,7 +294,7 @@
     <div class="scale-wrap" id="wrap-dna">
       <iframe
         id="iframe-dna"
-        src="https://nanosynth-llc.github.io/nanobot_synthesis/dna_elongation.html"
+        src="DNA_URL_HERE"
         scrolling="no"
         title="DNA Elongation">
       </iframe>
@@ -358,30 +352,17 @@
   const panelsEl  = document.getElementById('panels');
   const panelSpds = document.getElementById('panel-spds');
   const panelDna  = document.getElementById('panel-dna');
-  const lblSpds   = document.getElementById('lbl-spds');
-  const lblDna    = document.getElementById('lbl-dna');
-  const hoverHint = document.getElementById('hover-hint');
-
-  let hintHidden = false;
 
   function setActive(id) {
     panelsEl.classList.add('has-active');
     panelSpds.classList.toggle('active', id === 'spds');
     panelDna.classList.toggle('active',  id === 'dna');
-    lblSpds.classList.toggle('active', id === 'spds');
-    lblDna.classList.toggle('active',  id === 'dna');
-    if (!hintHidden) {
-      hoverHint.classList.add('hidden');
-      hintHidden = true;
-    }
   }
 
   function clearActive() {
     panelsEl.classList.remove('has-active');
     panelSpds.classList.remove('active');
     panelDna.classList.remove('active');
-    lblSpds.classList.remove('active');
-    lblDna.classList.remove('active');
   }
 
   panelSpds.addEventListener('mouseenter', () => setActive('spds'));
