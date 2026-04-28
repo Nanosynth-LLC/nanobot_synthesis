@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNA Elongation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #000000;
+    --panel:     #050505;
+    --border:    #0d2035;
+    --accent:    #00d4ff;
+    --accent2:   #0066ff;
+    --dim:       #061520;
+    --text:      #8ecfea;
+    --muted:     #1e4560;
+    --col-A:     #00ff88;
+    --col-T:     #ff3355;
+    --col-G:     #3399ff;
+    --col-C:     #ffaa00;
+  }
+
+  html, body {
+    background: #000;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    min-height: 100vh;
+  }
+
+  /* ── Scanline texture overlay on the whole page ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,212,255,0.012) 2px,
+      rgba(0,212,255,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  header::before, header::after {
+    content: '';
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 80px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent));
+  }
+  header::before { right: calc(100% + 16px); }
+  header::after  { left:  calc(100% + 16px); background: linear-gradient(90deg, var(--accent), transparent); }
+
+  header h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.5rem;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,212,255,0.7), 0 0 60px rgba(0,212,255,0.25);
+    margin-bottom: 5px;
+  }
+  header p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* ── Canvas wrapper with HUD frame ── */
+  #canvas-wrap {
+    position: relative;
+    border-radius: 4px;
+    overflow: visible; /* allow corner brackets to stick out */
+  }
+
+  /* Corner bracket decorations */
+  #canvas-wrap::before, #canvas-wrap::after,
+  #corner-bl, #corner-br {
+    content: '';
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--accent);
+    border-style: solid;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #canvas-wrap::before { top: -2px;    left:  -2px;  border-width: 2px 0 0 2px; }
+  #canvas-wrap::after  { top: -2px;    right: -2px;  border-width: 2px 2px 0 0; }
+  #corner-bl { bottom: -2px; left:  -2px;  border-width: 0 0 2px 2px; }
+  #corner-br { bottom: -2px; right: -2px;  border-width: 0 2px 2px 0; }
+
+  /* Outer glow ring */
+  #canvas-wrap .frame-glow {
+    position: absolute; inset: -1px;
+    border-radius: 4px;
+    box-shadow:
+      0 0 0 1px rgba(0,212,255,0.15),
+      0 0 30px rgba(0,212,255,0.08),
+      0 0 80px rgba(0,100,255,0.06),
+      inset 0 0 40px rgba(0,0,0,0.9);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  canvas { display: block; background: #000; border-radius: 3px; }
+
+  /* ── HUD status strip above canvas ── */
+  #hud-top {
+    width: 820px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 0 4px;
+  }
+  .hud-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .hud-tag b { color: var(--accent); }
+  #seq-readout {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    text-shadow: 0 0 8px rgba(0,212,255,0.5);
+    max-width: 380px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  /* ── Legend overlay ── */
+  #legend {
+    position: absolute;
+    top: 10px; left: 12px;
+    display: flex; gap: 6px;
+    pointer-events: none;
+    z-index: 8;
+  }
+  .leg {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(0,0,0,0.75);
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,212,255,0.12);
+    letter-spacing: 1px;
+  }
+  .leg-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* ── Controls panel ── */
+  #controls {
+    margin-top: 10px;
+    background: #000;
+    border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 4px;
+    padding: 16px 20px 18px;
+    width: 820px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 14px 20px;
+    position: relative;
+    box-shadow: 0 0 40px rgba(0,212,255,0.04);
+  }
+  /* Top accent line */
+  #controls::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20px; right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.35;
+  }
+
+  .ctrl label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 7px;
+  }
+  .ctrl label span { color: var(--accent); text-shadow: 0 0 6px rgba(0,212,255,0.5); }
+
+  .ctrl input[type=range] {
+    width: 100%; cursor: pointer;
+    -webkit-appearance: none;
+    height: 2px;
+    border-radius: 1px;
+    background: #0d2035;
+    outline: none;
+  }
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .ctrl input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.4);
+    box-shadow: 0 0 16px var(--accent);
+  }
+
+  .colors-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+    border-top: 1px solid rgba(0,212,255,0.06);
+  }
+  .colors-row > label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 4px;
+  }
+  .chip {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(0,212,255,0.04);
+    border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 2px;
+    padding: 3px 9px 3px 5px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    transition: border-color 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip input[type=color] {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+  }
+
+  .btn-row {
+    grid-column: 1 / -1;
+    display: flex; gap: 10px; flex-wrap: wrap;
+    border-top: 1px solid rgba(0,212,255,0.06);
+    padding-top: 12px;
+  }
+  button {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 7px 18px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,212,255,0.2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,212,255,0.06), transparent);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); text-shadow: 0 0 8px rgba(0,212,255,0.6); box-shadow: 0 0 12px rgba(0,212,255,0.1); }
+  button:hover::after { opacity: 1; }
+  button.active { background: rgba(0,212,255,0.12); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px rgba(0,212,255,0.2); }
+
+  /* Base count ticker */
+  #base-count {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-left: auto;
+    align-self: center;
+    padding-top: 12px;
+  }
+  #base-count b { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DNA Elongation</h1>
+  <p>Robotic Assembly · 5′ → 3′ Synthesis · ssDNA</p>
+</header>
+
+<div id="hud-top">
+  <span class="hud-tag">SYS: <b>ONLINE</b> &nbsp;|&nbsp; MODE: <b>AUTO</b></span>
+  <span id="seq-readout">SEQ: —</span>
+</div>
+
+<div id="canvas-wrap">
+  <div class="frame-glow"></div>
+  <div id="corner-bl"></div>
+  <div id="corner-br"></div>
+  <canvas id="c" width="820" height="430"></canvas>
+  <div id="legend">
+    <div class="leg"><div class="leg-dot" id="dot-A" style="background:var(--col-A)"></div><span id="lbl-A" style="color:var(--col-A)">A</span></div>
+    <div class="leg"><div class="leg-dot" id="dot-T" style="background:var(--col-T)"></div><span id="lbl-T" style="color:var(--col-T)">T</span></div>
+    <div class="leg"><div class="leg-dot" id="dot-G" style="background:var(--col-G)"></div><span id="lbl-G" style="color:var(--col-G)">G</span></div>
+    <div class="leg"><div class="leg-dot" id="dot-C" style="background:var(--col-C)"></div><span id="lbl-C" style="color:var(--col-C)">C</span></div>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="ctrl">
+    <label>Float Speed <span id="v-fs">1.5</span></label>
+    <input type="range" id="s-fs" min="0.2" max="6" step="0.1" value="1.5">
+  </div>
+  <div class="ctrl">
+    <label>Add Every (s) <span id="v-ar">2.0</span></label>
+    <input type="range" id="s-ar" min="0.5" max="10" step="0.5" value="2">
+  </div>
+  <div class="ctrl">
+    <label>Arm Speed <span id="v-fly">5</span></label>
+    <input type="range" id="s-fly" min="0.5" max="18" step="0.5" value="5">
+  </div>
+  <div class="ctrl">
+    <label>Base Size <span id="v-br">17</span></label>
+    <input type="range" id="s-br" min="8" max="30" step="1" value="17">
+  </div>
+  <div class="ctrl">
+    <label>Floater Count <span id="v-fc">14</span></label>
+    <input type="range" id="s-fc" min="3" max="60" step="1" value="14">
+  </div>
+  <div class="ctrl">
+    <label>Glow <span id="v-glow">On</span></label>
+    <input type="range" id="s-glow" min="0" max="1" step="1" value="1">
+  </div>
+
+  <div class="colors-row">
+    <label>Nucleotides</label>
+    <div class="chip"><span id="chip-A" style="color:var(--col-A)">A</span><input type="color" id="c-A" value="#00ff88"></div>
+    <div class="chip"><span id="chip-T" style="color:var(--col-T)">T</span><input type="color" id="c-T" value="#ff3355"></div>
+    <div class="chip"><span id="chip-G" style="color:var(--col-G)">G</span><input type="color" id="c-G" value="#3399ff"></div>
+    <div class="chip"><span id="chip-C" style="color:var(--col-C)">C</span><input type="color" id="c-C" value="#ffaa00"></div>
+  </div>
+
+  <div class="btn-row">
+    <button id="btn-pause">⏸&nbsp; Pause</button>
+    <button id="btn-reset">↺&nbsp; Reset</button>
+    <span id="base-count">LENGTH: <b id="len-num">2</b> nt</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const BASES  = ['A','T','G','C'];
+
+// Layout constants — bases added on the LEFT, strand grows rightward
+const ANCHOR_X     = 410;       // leftmost (newest) base position — centered on canvas
+const STRAND_Y     = H - 68;    // vertical center of strand
+const FLOAT_BOTTOM = H - 148;   // lower boundary for floating zone
+
+// ── Robot arm geometry ────────────────────────────────────────────────────────
+const SHOULDER   = { x: 433, y: STRAND_Y - 48 }; // shoulder pivot (fixed)
+const ARM_L1     = 78;    // upper arm length (px)
+const ARM_L2     = 70;    // forearm length (px)
+// IK gripper target positions for each phase
+const ARM_REST   = { x: 390, y: STRAND_Y + 18 }; // arm at rest / idle
+const ARM_PICKUP = { x: 303, y: STRAND_Y - 112 };// pickup spot in float zone
+const ARM_PLACE  = { x: ANCHOR_X, y: STRAND_Y }; // deposit on strand
+const ARM_SCAN   = { x: ANCHOR_X + 8, y: STRAND_Y - 78 }; // hover above to scan
+
+// Config (all mutable via controls)
+const cfg = {
+  floatSpeed: 1.5,
+  addRate:    2000,   // ms
+  flySpeed:   5,
+  r:          17,
+  floatCount: 14,
+  glowOn:     true,
+  colors: { A:'#00ff88', T:'#ff3355', G:'#3399ff', C:'#ffaa00' }
+};
+
+// State
+let strand   = [];   // [{base, pop}]
+let floaters = [];
+let arm      = null; // initialised in initArm()
+let lastAdd  = -99999;
+let paused   = false;
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const rand = n => Math.random() * n;
+const randBase = () => BASES[Math.floor(rand(4))];
+
+function strandX(i) {
+  // newest base sits at ANCHOR_X (left); older bases shift rightward
+  return ANCHOR_X + (strand.length - 1 - i) * (cfg.r * 2.6);
+}
+
+function makeFloater() {
+  const angle = rand(Math.PI * 2);
+  const spd   = 0.4 + rand(cfg.floatSpeed);
+  // ~70% spawn clustered near the arm's pickup zone so they look like the source
+  let x, y;
+  if (Math.random() < 0.70) {
+    const spread = 85;
+    x = ARM_PICKUP.x + (rand(spread * 2) - spread);
+    y = ARM_PICKUP.y + (rand(spread * 2) - spread);
+    x = Math.max(cfg.r, Math.min(W - cfg.r, x));
+    y = Math.max(cfg.r, Math.min(FLOAT_BOTTOM - cfg.r, y));
+  } else {
+    x = cfg.r + rand(W - 2 * cfg.r);
+    y = cfg.r + rand(FLOAT_BOTTOM - 2 * cfg.r);
+  }
+  return {
+    base:  randBase(),
+    x, y,
+    vx:    Math.cos(angle) * spd,
+    vy:    Math.sin(angle) * spd,
+    phase: rand(Math.PI * 2),
+    wobR:  0.5 + rand(0.5)
+  };
+}
+
+// ─── IK solver ────────────────────────────────────────────────────────────────
+
+function smoothstep(t) { t = Math.max(0, Math.min(1, t)); return t*t*(3-2*t); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+// Returns the point on the surface of a circle (at cx,cy radius r) closest to (fromX,fromY)
+function edgeOf(cx, cy, fromX, fromY) {
+  const dx = fromX - cx, dy = fromY - cy;
+  const d  = Math.hypot(dx, dy) || 1;
+  return { x: cx + dx/d * cfg.r, y: cy + dy/d * cfg.r };
+}
+
+function solveIK(tx, ty) {
+  const dx = tx - SHOULDER.x, dy = ty - SHOULDER.y;
+  let d = Math.hypot(dx, dy);
+  d = Math.max(Math.abs(ARM_L1 - ARM_L2) + 0.5, Math.min(ARM_L1 + ARM_L2 - 0.5, d));
+
+  const cosT2 = (d*d - ARM_L1*ARM_L1 - ARM_L2*ARM_L2) / (2*ARM_L1*ARM_L2);
+  const t2    = Math.acos(Math.max(-1, Math.min(1, cosT2)));
+  // Use +atan2 to flip elbow above the arm line
+  const t1    = Math.atan2(dy, dx) + Math.atan2(ARM_L2*Math.sin(t2), ARM_L1 + ARM_L2*Math.cos(t2));
+
+  return {
+    ex:    SHOULDER.x + ARM_L1 * Math.cos(t1),
+    ey:    SHOULDER.y + ARM_L1 * Math.sin(t1),
+    gx:    SHOULDER.x + ARM_L1*Math.cos(t1) + ARM_L2*Math.cos(t1 - t2),
+    gy:    SHOULDER.y + ARM_L1*Math.sin(t1) + ARM_L2*Math.sin(t1 - t2),
+    angle: t1 - t2
+  };
+}
+
+// ─── init ─────────────────────────────────────────────────────────────────────
+
+function initStrand() {
+  strand = ['A','T'].map(b => ({ base: b, pop: 0 }));
+}
+
+function initFloaters() {
+  floaters = Array.from({ length: cfg.floatCount }, makeFloater);
+}
+
+function initArm() {
+  arm = {
+    state:       'idle',
+    t:           0,
+    heldBase:    null,
+    pickupBase:  null,
+    pickupAlpha: 0,
+    gripOpen:    1.0,
+    scanBase:    null,
+    _reachFrom:  null,
+    tgx: ARM_REST.x,
+    tgy: ARM_REST.y,
+  };
+}
+
+// ─── update ───────────────────────────────────────────────────────────────────
+
+function updateFloaters() {
+  for (const f of floaters) {
+    f.x += f.vx;
+    f.y += f.vy;
+    f.phase += 0.025;
+
+    // Random gentle nudge
+    f.vx += (rand(0.1) - 0.05);
+    f.vy += (rand(0.1) - 0.05);
+
+    // Speed clamp
+    const spd = Math.hypot(f.vx, f.vy);
+    const max = cfg.floatSpeed * 2.2;
+    if (spd > max) { f.vx = f.vx/spd * max; f.vy = f.vy/spd * max; }
+    const min = 0.3;
+    if (spd < min && spd > 0) { f.vx = f.vx/spd * min; f.vy = f.vy/spd * min; }
+
+    // Bounce walls — full canvas, floaters allowed everywhere
+    const r   = cfg.r;
+    if (f.x < r)              { f.x = r;              f.vx =  Math.abs(f.vx); }
+    if (f.x > W - r)          { f.x = W - r;          f.vx = -Math.abs(f.vx); }
+    if (f.y < r)              { f.y = r;               f.vy =  Math.abs(f.vy); }
+    if (f.y > FLOAT_BOTTOM-r) { f.y = FLOAT_BOTTOM-r; f.vy = -Math.abs(f.vy); }
+  }
+}
+
+function updateArm(timestamp) {
+  const spd = cfg.flySpeed / 5; // normalized: 1.0 at default
+
+  if (arm.state === 'idle') {
+    arm.tgx = ARM_REST.x; arm.tgy = ARM_REST.y;
+    arm.gripOpen = 1.0;
+    if (timestamp - lastAdd >= cfg.addRate) {
+      lastAdd         = timestamp;
+      arm.pickupBase  = randBase();
+      arm.pickupAlpha = 0;
+      // First reach comes from rest — point ARM_SCAN at rest so reaching lerp is correct
+      arm.state       = 'reaching';
+      arm.t           = 0;
+      // Override: for idle→reaching, patch scan position to rest so lerp starts right
+      // We do this by temporarily repurposing the reaching lerp start in the reaching block
+      arm._reachFrom  = { x: ARM_REST.x, y: ARM_REST.y };
+    }
+    return;
+  }
+
+  if (arm.state === 'reaching') {
+    arm.t = Math.min(1, arm.t + 0.018 * spd);
+    const s   = smoothstep(arm.t);
+    const fx  = arm._reachFrom ? arm._reachFrom.x : ARM_SCAN.x;
+    const fy  = arm._reachFrom ? arm._reachFrom.y : ARM_SCAN.y;
+    // Target the edge of the pickup base circle, approached from the lerp start
+    const pe  = edgeOf(ARM_PICKUP.x, ARM_PICKUP.y, fx, fy);
+    arm.tgx = lerp(fx, pe.x, s);
+    arm.tgy = lerp(fy, pe.y, s);
+    arm.pickupAlpha = Math.min(1, arm.t * 2.2);
+    arm.gripOpen = 1.0;
+    if (arm.t >= 1) { arm._reachFrom = null; arm.state = 'grabbing'; arm.t = 0; }
+    return;
+  }
+
+  if (arm.state === 'grabbing') {
+    arm.t = Math.min(1, arm.t + 0.055 * spd);
+    arm.gripOpen = lerp(1.0, 0.0, smoothstep(arm.t));
+    const pe = edgeOf(ARM_PICKUP.x, ARM_PICKUP.y, SHOULDER.x, SHOULDER.y);
+    arm.tgx = pe.x; arm.tgy = pe.y;
+    if (arm.t >= 1) {
+      arm.heldBase    = arm.pickupBase;
+      arm.pickupBase  = null;
+      arm.pickupAlpha = 0;
+      arm.state       = 'returning'; arm.t = 0;
+    }
+    return;
+  }
+
+  if (arm.state === 'returning') {
+    arm.t = Math.min(1, arm.t + 0.016 * spd);
+    const s   = smoothstep(arm.t);
+    const pe  = edgeOf(ARM_PICKUP.x, ARM_PICKUP.y, SHOULDER.x, SHOULDER.y);
+    const plc = { x: strandX(strand.length - 1) - cfg.r, y: STRAND_Y };
+    const pl  = edgeOf(plc.x, plc.y, SHOULDER.x, SHOULDER.y);
+    arm.tgx = lerp(pe.x, pl.x, s);
+    arm.tgy = lerp(pe.y, pl.y, s);
+    arm.gripOpen = 0.0;
+    if (arm.t >= 1) { arm.state = 'placing'; arm.t = 0; }
+    return;
+  }
+
+  if (arm.state === 'placing') {
+    arm.t = Math.min(1, arm.t + 0.055 * spd);
+    arm.gripOpen = lerp(0.0, 1.0, smoothstep(arm.t));
+    const plc = { x: strandX(strand.length - 1) - cfg.r, y: STRAND_Y };
+    const pl  = edgeOf(plc.x, plc.y, SHOULDER.x, SHOULDER.y);
+    arm.tgx = pl.x; arm.tgy = pl.y;
+    if (arm.t >= 0.45 && arm.heldBase) {
+      strand.push({ base: arm.heldBase, pop: 1 });
+      arm.scanBase = arm.heldBase;
+      arm.heldBase = null;
+    }
+    if (arm.t >= 1) { arm.state = 'scanning'; arm.t = 0; }
+    return;
+  }
+
+  if (arm.state === 'scanning') {
+    arm.t = Math.min(1, arm.t + 0.010 * spd);
+    const moveProg = smoothstep(Math.min(1, arm.t / 0.25));
+    const plc = { x: strandX(strand.length - 1) - cfg.r, y: STRAND_Y };
+    const pl  = edgeOf(plc.x, plc.y, SHOULDER.x, SHOULDER.y);
+    arm.tgx = lerp(pl.x, ARM_SCAN.x, moveProg);
+    arm.tgy = lerp(pl.y, ARM_SCAN.y, moveProg);
+    arm.gripOpen = 0.55;
+    if (arm.t >= 1) {
+      arm.scanBase = null;
+      lastAdd      = -99999;
+      arm.pickupBase  = randBase();
+      arm.pickupAlpha = 0;
+      arm._reachFrom  = null;  // null → uses ARM_SCAN as start
+      arm.state    = 'reaching';
+      arm.t        = 0;
+    }
+    return;
+  }
+
+  if (arm.state === 'releasing') {
+    arm.t = Math.min(1, arm.t + 0.07 * spd);
+    const s = smoothstep(arm.t);
+    arm.tgx = lerp(ARM_SCAN.x, ARM_REST.x, s);
+    arm.tgy = lerp(ARM_SCAN.y, ARM_REST.y, s);
+    arm.gripOpen = 1.0;
+    if (arm.t >= 1) { arm.state = 'idle'; arm.t = 0; }
+    return;
+  }
+}
+
+function updatePops() {
+  for (const s of strand) {
+    if (s.pop > 0) s.pop = Math.max(0, s.pop - 0.035);
+  }
+}
+
+// ─── draw ─────────────────────────────────────────────────────────────────────
+
+function drawBase(x, y, base, alpha, scale, glow) {
+  const r = cfg.r * (scale || 1);
+  const col = cfg.colors[base];
+  ctx.save();
+  ctx.globalAlpha = (alpha !== undefined ? alpha : 1);
+  ctx.translate(x, y);
+
+  if (glow && cfg.glowOn) {
+    ctx.shadowColor = col;
+    ctx.shadowBlur  = 20;
+  }
+
+  // Circle fill
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.fill();
+
+  // Rim highlight
+  ctx.shadowBlur = 0;
+  const rim = ctx.createRadialGradient(-r*0.3, -r*0.35, r*0.05, 0, 0, r);
+  rim.addColorStop(0, 'rgba(255,255,255,0.30)');
+  rim.addColorStop(0.5, 'rgba(255,255,255,0.0)');
+  rim.addColorStop(1, 'rgba(0,0,0,0.18)');
+  ctx.fillStyle = rim;
+  ctx.fill();
+
+  // Outline
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Letter
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 ${Math.round(r * 0.88)}px 'Space Mono', monospace`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(base, 0, 0.5);
+
+  ctx.restore();
+}
+
+function drawBackground(t) {
+  // Pure black base
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Perspective grid ──────────────────────────────────────────────────────
+  const horizY = FLOAT_BOTTOM + 12;
+
+  // Vertical grid lines — faint cyan, fade toward horizon
+  ctx.save();
+  for (let x = 0; x <= W; x += 44) {
+    const grad = ctx.createLinearGradient(x, 0, x, horizY);
+    grad.addColorStop(0,   'rgba(0,180,255,0)');
+    grad.addColorStop(0.7, 'rgba(0,180,255,0.025)');
+    grad.addColorStop(1,   'rgba(0,180,255,0.07)');
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, horizY);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  // Horizontal grid lines in float zone
+  for (let y = 36; y < horizY; y += 36) {
+    const alpha = (y / horizY) * 0.055;
+    ctx.beginPath();
+    ctx.moveTo(0, y); ctx.lineTo(W, y);
+    ctx.strokeStyle = `rgba(0,180,255,${alpha})`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Strand zone floor line ────────────────────────────────────────────────
+  const divGrad = ctx.createLinearGradient(0, 0, W, 0);
+  divGrad.addColorStop(0,    'rgba(0,212,255,0)');
+  divGrad.addColorStop(0.12, 'rgba(0,212,255,0.22)');
+  divGrad.addColorStop(0.5,  'rgba(0,212,255,0.35)');
+  divGrad.addColorStop(0.88, 'rgba(0,212,255,0.22)');
+  divGrad.addColorStop(1,    'rgba(0,212,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(0, horizY); ctx.lineTo(W, horizY);
+  ctx.strokeStyle = divGrad;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ── Vignette ─────────────────────────────────────────────────────────────
+  const vig = ctx.createRadialGradient(W/2, H/2, H*0.25, W/2, H/2, H*0.85);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.65)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Animated scan-line sweep across float zone ────────────────────────────
+  const sweepY = ((t * 0.025) % 1) * horizY;
+  const swGrad = ctx.createLinearGradient(0, sweepY - 40, 0, sweepY + 8);
+  swGrad.addColorStop(0, 'rgba(0,212,255,0)');
+  swGrad.addColorStop(1, 'rgba(0,212,255,0.028)');
+  ctx.fillStyle = swGrad;
+  ctx.fillRect(0, sweepY - 40, W, 48);
+
+  // ── HUD corner data tags ──────────────────────────────────────────────────
+  ctx.font = "10px 'Share Tech Mono', monospace";
+  ctx.fillStyle = 'rgba(0,212,255,0.22)';
+  ctx.textAlign = 'left';   ctx.textBaseline = 'top';
+  ctx.fillText('NUCL-SIM v2.4', 10, 10);
+  ctx.textAlign = 'right';
+  ctx.fillText('CAM-01 · LIVE', W - 10, 10);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`FRAME ${Math.floor(t / 16.67).toString().padStart(6,'0')}`, 10, H - 8);
+  ctx.textAlign = 'right';
+  ctx.fillText('SYNTHESIS ACTIVE', W - 10, H - 8);
+
+  // ── Blinking REC indicator ────────────────────────────────────────────────
+  if (Math.floor(t / 600) % 2 === 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(W - 86, H - 13, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff2244';
+    if (cfg.glowOn) { ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 10; }
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,34,68,0.7)';
+    ctx.font = "10px 'Share Tech Mono', monospace";
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('● REC', W - 74, H - 8);
+  }
+}
+
+function drawStrand() {
+  if (strand.length === 0) return;
+  const spacing = cfg.r * 2.6;
+
+  // Newest base at ANCHOR_X (left); older bases extend rightward
+  // Clip oldest (rightmost) bases that go off screen
+  const maxVis  = Math.floor((W - ANCHOR_X - cfg.r) / spacing) + 1;
+  const visStart = Math.max(0, strand.length - maxVis); // oldest visible index
+
+  // Backbone gradient line
+  if (strand.length > 1) {
+    const x0 = strandX(strand.length - 1); // ANCHOR_X — newest (left)
+    const x1 = Math.min(strandX(visStart), W - cfg.r * 2); // oldest visible (right)
+
+    // glow line
+    if (cfg.glowOn) {
+      ctx.beginPath();
+      ctx.moveTo(x0, STRAND_Y);
+      ctx.lineTo(x1, STRAND_Y);
+      ctx.strokeStyle = 'rgba(0,212,255,0.18)';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+    }
+
+    // Gradient: solid at left (newest), fades right (oldest)
+    const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+    grad.addColorStop(0, 'rgba(0,212,255,0.9)');
+    grad.addColorStop(0.88, 'rgba(0,130,255,0.6)');
+    grad.addColorStop(1, 'rgba(0,100,255,0)');
+    ctx.beginPath();
+    ctx.moveTo(x0, STRAND_Y);
+    ctx.lineTo(x1, STRAND_Y);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+  }
+
+  // Draw bases (newest on left, older rightward; skip any off right edge)
+  for (let i = visStart; i < strand.length; i++) {
+    const x = strandX(i);
+    if (x > W + cfg.r * 2) continue;
+    const pop = strand[i].pop || 0;
+    const scale = pop > 0 ? 1 + 0.55 * Math.sin(pop * Math.PI) * pop : 1;
+    drawBase(x, STRAND_Y, strand[i].base, 1, scale, false);
+  }
+}
+
+function drawFloaters(t) {
+  for (const f of floaters) {
+    const alpha = 0.62 + 0.22 * Math.sin(f.phase);
+    const scale = 1 + 0.04 * Math.sin(f.phase * 1.3) * f.wobR;
+    drawBase(f.x, f.y, f.base, alpha, scale, false);
+  }
+}
+
+function drawScanRay(gx, gy) {
+  if (arm.state !== 'scanning') return;
+  const t = arm.t;
+
+  // Fade in (0→0.22), hold, fade out (0.88→1)
+  const alpha = t < 0.22 ? smoothstep(t / 0.22)
+              : t > 0.88 ? 1 - smoothstep((t - 0.88) / 0.12)
+              : 1;
+  if (alpha <= 0.01) return;
+
+  // Direction from gripper toward the placed base
+  const dx = ANCHOR_X - gx, dy = STRAND_Y - gy;
+  const baseAngle = Math.atan2(dy, dx);
+  const rayLen    = Math.hypot(dx, dy) + 18;
+
+  // Sweep oscillation: 2.5 cycles during mid-phase
+  const sweepProg = Math.max(0, (t - 0.18) / 0.70);
+  const sweep     = Math.sin(sweepProg * Math.PI * 5) * 0.26;
+  const rayAngle  = baseAngle + sweep;
+
+  const fanW   = 0.13;
+  const rayEX  = gx + Math.cos(rayAngle) * rayLen;
+  const rayEY  = gy + Math.sin(rayAngle) * rayLen;
+
+  // ── Fan beam fill ────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.17;
+  if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 30; }
+  ctx.beginPath();
+  ctx.moveTo(gx, gy);
+  ctx.lineTo(gx + Math.cos(rayAngle - fanW) * rayLen,
+             gy + Math.sin(rayAngle - fanW) * rayLen);
+  ctx.lineTo(gx + Math.cos(rayAngle + fanW) * rayLen,
+             gy + Math.sin(rayAngle + fanW) * rayLen);
+  ctx.closePath();
+  ctx.fillStyle = '#33ffaa';
+  ctx.fill();
+  ctx.restore();
+
+  // ── Core beam line ───────────────────────────────────────────────────────
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.9;
+  ctx.beginPath();
+  ctx.moveTo(gx, gy);
+  ctx.lineTo(rayEX, rayEY);
+  ctx.strokeStyle = '#bbffdd';
+  ctx.lineWidth   = 2.5;
+  ctx.lineCap     = 'round';
+  if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 16; }
+  ctx.stroke();
+  // Bright inner core
+  ctx.globalAlpha = alpha * 0.5;
+  ctx.strokeStyle = '#eeffee';
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Emitter dot at gripper tip ───────────────────────────────────────────
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.9;
+  ctx.beginPath();
+  ctx.arc(gx, gy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#eeffee';
+  if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 14; }
+  ctx.fill();
+  ctx.restore();
+
+  // ── Pulsing scan ring on the target base ─────────────────────────────────
+  if (t > 0.18 && t < 0.90) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 18);
+    const ringR = cfg.r + 2 + pulse * 6;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.75 * (0.4 + 0.6 * pulse);
+    ctx.beginPath();
+    ctx.arc(ANCHOR_X, STRAND_Y, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#33ffaa';
+    ctx.lineWidth   = 1.8;
+    if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 12; }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Sweeping horizontal scan line across the base ────────────────────────
+  if (t > 0.22 && t < 0.88) {
+    const scanY = STRAND_Y + Math.sin(sweepProg * Math.PI * 5) * (cfg.r * 0.85);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(ANCHOR_X - cfg.r - 5, scanY);
+    ctx.lineTo(ANCHOR_X + cfg.r + 5, scanY);
+    ctx.strokeStyle = '#aaffcc';
+    ctx.lineWidth   = 1.5;
+    if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 8; }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Confirmation burst (end of scan) ─────────────────────────────────────
+  if (t > 0.86) {
+    const fp   = smoothstep((t - 0.86) / 0.14);
+    const fAlp = fp * (1 - fp * 0.6);
+    // Expanding ring
+    ctx.save();
+    ctx.globalAlpha = alpha * fAlp * 0.8;
+    ctx.beginPath();
+    ctx.arc(ANCHOR_X, STRAND_Y, cfg.r * (1 + fp * 1.8), 0, Math.PI * 2);
+    ctx.strokeStyle = '#88ffcc';
+    ctx.lineWidth   = 2.5;
+    if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 22; }
+    ctx.stroke();
+    ctx.restore();
+    // Star-burst spokes
+    ctx.save();
+    ctx.globalAlpha = alpha * fAlp * 0.65;
+    ctx.strokeStyle = '#bbffdd';
+    ctx.lineWidth   = 1.5;
+    if (cfg.glowOn) { ctx.shadowColor = '#33ffaa'; ctx.shadowBlur = 10; }
+    for (let i = 0; i < 6; i++) {
+      const a   = (i / 6) * Math.PI * 2 + fp * 0.4;
+      const r0  = cfg.r + 3;
+      const r1  = cfg.r + 3 + fp * 14;
+      ctx.beginPath();
+      ctx.moveTo(ANCHOR_X + Math.cos(a) * r0, STRAND_Y + Math.sin(a) * r0);
+      ctx.lineTo(ANCHOR_X + Math.cos(a) * r1, STRAND_Y + Math.sin(a) * r1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawArm() {
+  const ik = solveIK(arm.tgx, arm.tgy);
+  const { ex, ey, gx, gy, angle } = ik;
+
+  // ── Pickup spot: base fading in ───────────────────────────────────────────
+  if (arm.pickupBase && arm.pickupAlpha > 0) {
+    // Soft target ring
+    ctx.save();
+    ctx.globalAlpha = arm.pickupAlpha * 0.22;
+    ctx.beginPath();
+    ctx.arc(ARM_PICKUP.x, ARM_PICKUP.y, cfg.r + 8, 0, Math.PI*2);
+    ctx.strokeStyle = cfg.colors[arm.pickupBase];
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    drawBase(ARM_PICKUP.x, ARM_PICKUP.y, arm.pickupBase, arm.pickupAlpha, 1, false);
+  }
+
+  // ── Shoulder housing / mount bracket ─────────────────────────────────────
+  ctx.save();
+  ctx.fillStyle   = '#050e18';
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(SHOULDER.x - 16, SHOULDER.y - 14, 32, 28, 3);
+  ctx.fill(); ctx.stroke();
+  for (const [rx, ry] of [[-10,-8],[10,-8],[-10,8],[10,8]]) {
+    ctx.beginPath();
+    ctx.arc(SHOULDER.x+rx, SHOULDER.y+ry, 2, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,212,255,0.25)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // ── Arm glow halo ─────────────────────────────────────────────────────────
+  if (cfg.glowOn) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,212,255,0.5)';
+    ctx.shadowBlur  = 18;
+    ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+    ctx.lineWidth   = 22;
+    ctx.lineCap     = 'round';
+    ctx.beginPath();
+    ctx.moveTo(SHOULDER.x, SHOULDER.y);
+    ctx.lineTo(ex, ey);
+    ctx.lineTo(gx, gy);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Upper arm segment ─────────────────────────────────────────────────────
+  ctx.save();
+  ctx.lineCap     = 'round';
+  ctx.strokeStyle = '#1a3a52';
+  ctx.lineWidth   = 14;
+  ctx.beginPath();
+  ctx.moveTo(SHOULDER.x, SHOULDER.y);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.strokeStyle = '#2a5878';
+  ctx.lineWidth   = 10;
+  ctx.stroke();
+  // cyan highlight stripe
+  ctx.strokeStyle = 'rgba(0,212,255,0.18)';
+  ctx.lineWidth   = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Forearm segment ───────────────────────────────────────────────────────
+  ctx.save();
+  ctx.lineCap     = 'round';
+  ctx.strokeStyle = '#152d42';
+  ctx.lineWidth   = 10;
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(gx, gy);
+  ctx.stroke();
+  ctx.strokeStyle = '#1e4460';
+  ctx.lineWidth   = 7;
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,212,255,0.15)';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Shoulder joint ────────────────────────────────────────────────────────
+  ctx.save();
+  if (cfg.glowOn) { ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 14; }
+  ctx.beginPath();
+  ctx.arc(SHOULDER.x, SHOULDER.y, 11, 0, Math.PI*2);
+  ctx.fillStyle = '#1e4460';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,212,255,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(SHOULDER.x, SHOULDER.y, 5, 0, Math.PI*2);
+  ctx.fillStyle = '#00d4ff';
+  if (cfg.glowOn) { ctx.shadowBlur = 10; }
+  ctx.fill();
+  ctx.restore();
+
+  // ── Elbow joint ───────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(ex, ey, 8, 0, Math.PI*2);
+  ctx.fillStyle = '#1a3a52';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(ex, ey, 3.5, 0, Math.PI*2);
+  ctx.fillStyle = '#00aadd'; ctx.fill();
+  ctx.restore();
+
+  // ── Gripper / claw ────────────────────────────────────────────────────────
+  // gripOpen=1 → 150° total (1.309 rad/side); gripOpen=0 → 50° total (0.436 rad/side)
+  const spread  = lerp(0.436, 1.309, arm.gripOpen);
+  const clawLen = 16;
+  const hookLen = 7;
+
+  ctx.save();
+  ctx.translate(gx, gy);
+  ctx.rotate(angle);
+
+  // Knuckle
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI*2);
+  ctx.fillStyle = '#1e4460';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,212,255,0.4)';
+  ctx.lineWidth = 1; ctx.stroke();
+
+  // Two fingers
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.rotate(side * spread);
+    ctx.beginPath();
+    ctx.moveTo(3, 0); ctx.lineTo(clawLen, 0);
+    ctx.strokeStyle = '#2a5878';
+    ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,212,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(clawLen, 0);
+    ctx.lineTo(clawLen + hookLen, side * -5);
+    ctx.strokeStyle = '#00aadd';
+    ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // ── Held base (rides with the gripper) ────────────────────────────────────
+  // Gripper tip is at the circle edge, so base center is cfg.r back along the arm direction
+  if (arm.heldBase) {
+    const bx = gx + Math.cos(angle) * cfg.r * 1.5;
+    const by = gy + Math.sin(angle) * cfg.r * 1.5;
+    drawBase(bx, by, arm.heldBase, 1, 1, cfg.glowOn);
+  }
+
+  // ── Scan ray (drawn on top of everything) ─────────────────────────────────
+  drawScanRay(gx, gy);
+}
+
+// ─── main loop ────────────────────────────────────────────────────────────────
+
+let last = 0;
+function loop(t) {
+  if (!paused) {
+    ctx.clearRect(0, 0, W, H);
+    drawBackground(t);
+    updateFloaters();
+    updateArm(t);
+    updatePops();
+    drawFloaters(t);
+    drawArm();
+    drawStrand();
+
+    // Update HUD elements
+    const seq = strand.map(s => s.base).join('');
+    document.getElementById('seq-readout').textContent =
+      'SEQ: ' + (seq.length > 55 ? '…' + seq.slice(-55) : seq);
+    document.getElementById('len-num').textContent = strand.length;
+  }
+  last = t;
+  requestAnimationFrame(loop);
+}
+
+// ─── controls wiring ──────────────────────────────────────────────────────────
+
+function slider(id, valId, fn) {
+  const el = document.getElementById(id);
+  const vl = document.getElementById(valId);
+  el.addEventListener('input', () => { vl.textContent = el.value; fn(+el.value); });
+}
+
+slider('s-fs',  'v-fs',  v => cfg.floatSpeed = v);
+slider('s-ar',  'v-ar',  v => cfg.addRate    = v * 1000);
+slider('s-fly', 'v-fly', v => cfg.flySpeed   = v);
+slider('s-br',  'v-br',  v => cfg.r          = v);
+slider('s-fc',  'v-fc',  v => {
+  cfg.floatCount = v;
+  while (floaters.length < cfg.floatCount) floaters.push(makeFloater());
+  while (floaters.length > cfg.floatCount) floaters.pop();
+});
+slider('s-glow', 'v-glow', v => {
+  cfg.glowOn = !!v;
+  document.getElementById('v-glow').textContent = v ? 'On' : 'Off';
+});
+
+for (const b of BASES) {
+  document.getElementById('c-' + b).addEventListener('input', function() {
+    cfg.colors[b] = this.value;
+    const chip = document.getElementById('chip-' + b);
+    const lbl  = document.getElementById('lbl-' + b);
+    const dot  = document.getElementById('dot-' + b);
+    chip.style.color = this.value;
+    if (lbl) lbl.style.color = this.value;
+    if (dot) dot.style.background = this.value;
+  });
+}
+
+document.getElementById('btn-pause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '▶\u00a0 Resume' : '⏸\u00a0 Pause';
+  this.classList.toggle('active', paused);
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  lastAdd = -99999;
+  initStrand();
+  initFloaters();
+  initArm();
+});
+
+// ─── start ────────────────────────────────────────────────────────────────────
+initStrand();
+initFloaters();
+initArm();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
