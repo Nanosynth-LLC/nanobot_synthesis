@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solid-Phase DNA Synthesis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000000;
+    color: #c8d8f0;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 10px;
+  }
+  #app {
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  header { text-align: center; width: 100%; }
+  header h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #58a6ff;
+    line-height: 1.2;
+  }
+  header .subtitle {
+    font-size: 18px;
+    letter-spacing: 1.5px;
+    color: #3d5275;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  canvas { display: block; }
+  #step-panel {
+    width: 100%;
+    background: #0d1a2d;
+    border: 1px solid #1a2d4a;
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #step-name-display {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 1px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #step-color-dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; }
+  #step-desc-display { display: none; }
+  #progress-bar-track { height: 2px; background: #1a2d4a; border-radius: 2px; margin-top: 2px; overflow: hidden; }
+  #progress-bar-fill { height: 100%; border-radius: 2px; transition: width 0.05s linear; }
+  #cycle-steps {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+  }
+  .cycle-step {
+    background: #0d1a2d;
+    border: 1px solid #1a2d4a;
+    border-radius: 3px;
+    padding: 4px 3px;
+    text-align: center;
+    transition: all 0.3s;
+    opacity: 0.45;
+  }
+  .cycle-step.active { opacity: 1; }
+  .cycle-step .cs-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 auto 3px; }
+  .cycle-step .cs-label { font-size: 15px; color: #7a9bc4; text-transform: uppercase; letter-spacing: 0.3px; }
+  #dna-counter {
+    width: 100%;
+    background: #0d1a2d;
+    border: 1px solid #1a2d4a;
+    border-radius: 4px;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+  }
+  #dna-counter .label { color: #3d5275; text-transform: uppercase; letter-spacing: 1px; }
+  #dna-sequence { color: #58a6ff; font-size: 18px; letter-spacing: 1px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #cycle-count { color: #a371f7; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 32px; }
+  #controls {
+    width: 100%;
+    background: #0d1a2d;
+    border: 1px solid #1a2d4a;
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .ctrl-row { display: flex; align-items: center; gap: 8px; }
+  .ctrl-label { font-size: 17px; color: #3d5275; text-transform: uppercase; letter-spacing: 0.8px; width: 80px; flex-shrink: 0; }
+  input[type=range] {
+    flex: 1; -webkit-appearance: none;
+    height: 3px; background: #1a2d4a; border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 10px; height: 10px;
+    background: #58a6ff; border-radius: 50%; cursor: pointer;
+  }
+  .speed-val { font-size: 18px; color: #58a6ff; width: 40px; text-align: right; }
+  .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+  .color-item { display: flex; align-items: center; gap: 6px; font-size: 17px; color: #7a9bc4; cursor: pointer; }
+  .color-item input[type=color] {
+    width: 24px; height: 24px; border: 1px solid #1a2d4a;
+    border-radius: 3px; cursor: pointer; padding: 0; background: none;
+  }
+  .ctrl-divider { border: none; border-top: 1px solid #1a2d4a; }
+  .btn-row { display: flex; gap: 6px; }
+  .ctrl-btn {
+    flex: 1;
+    background: #1a2d4a; border: 1px solid #2a3d5a; border-radius: 3px;
+    color: #c8d8f0; font-family: 'Share Tech Mono', monospace;
+    font-size: 18px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 8px; cursor: pointer; transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: #243852; border-color: #58a6ff; color: #58a6ff; }
+  .ctrl-btn.active { background: #1c3a6e; border-color: #58a6ff; color: #58a6ff; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Solid-Phase DNA Synthesis</h1>
+    <div class="subtitle">Phosphoramidite Method · Automated Cycle</div>
+  </header>
+
+  <canvas id="c" width="220" height="400"></canvas>
+
+  <div id="step-panel">
+    <div id="step-name-display">
+      <div id="step-color-dot"></div>
+      <span id="step-name-text">Initializing...</span>
+    </div>
+    <div id="step-desc-display">Starting synthesis cycle...</div>
+    <div id="progress-bar-track"><div id="progress-bar-fill" style="width:0%"></div></div>
+  </div>
+
+  <div id="cycle-steps">
+    <div class="cycle-step" id="cs-deprotection">
+      <div class="cs-dot" style="background:#FF6B35"></div>
+      <div class="cs-label">Deprotect</div>
+    </div>
+    <div class="cycle-step" id="cs-coupling">
+      <div class="cs-dot" style="background:#3DD68C"></div>
+      <div class="cs-label">Couple</div>
+    </div>
+    <div class="cycle-step" id="cs-capping">
+      <div class="cs-dot" style="background:#4FC3F7"></div>
+      <div class="cs-label">Cap</div>
+    </div>
+    <div class="cycle-step" id="cs-oxidation">
+      <div class="cs-dot" style="background:#C6972A"></div>
+      <div class="cs-label">Oxidize</div>
+    </div>
+  </div>
+
+  <div id="dna-counter">
+    <div>
+      <div class="label">Cycle</div>
+      <div id="cycle-count">0</div>
+    </div>
+    <div style="text-align:right">
+      <div class="label">Sequence</div>
+      <div id="dna-sequence">—</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="ctrl-row">
+      <div class="ctrl-label">Speed</div>
+      <input type="range" id="speed-slider" min="0.2" max="5" step="0.1" value="1">
+      <div class="speed-val" id="speed-val">1×</div>
+    </div>
+    <hr class="ctrl-divider">
+    <div class="ctrl-row" style="align-items:flex-start">
+      <div class="ctrl-label" style="padding-top:2px">Colors</div>
+      <div class="color-grid">
+        <label class="color-item"><input type="color" id="col-deprotection" value="#FF6B35"> Deprotect</label>
+        <label class="color-item"><input type="color" id="col-coupling"     value="#3DD68C"> Couple</label>
+        <label class="color-item"><input type="color" id="col-capping"      value="#4FC3F7"> Cap</label>
+        <label class="color-item"><input type="color" id="col-oxidation"    value="#C6972A"> Oxidize</label>
+      </div>
+    </div>
+    <hr class="ctrl-divider">
+    <div class="btn-row">
+      <button class="ctrl-btn active" id="play-btn">⏸ Pause</button>
+      <button class="ctrl-btn" id="reset-btn">↺ Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+
+// ── Column geometry ──────────────────────────────────────────────────────
+const colCX     = CW / 2;
+const colInnerW = 72;
+const colWall   = 7;
+const colTop    = 54;
+const colBot    = CH - 72;
+const colH      = colBot - colTop;
+const colLeft   = colCX - colInnerW / 2;
+const colRight  = colLeft + colInnerW;
+const fritH     = 18;
+const beadH     = 22;
+
+// The zone through which liquid can flow (above frit)
+const lzTop = colTop;
+const lzBot = colBot - fritH;
+const lzH   = lzBot - lzTop;
+
+// ── Steps ────────────────────────────────────────────────────────────────
+let stepColors = {
+  deprotection: '#FF6B35',
+  coupling:     '#3DD68C',
+  capping:      '#4FC3F7',
+  oxidation:    '#C6972A',
+  wash:         '#9bbedd',
+};
+const STEPS = [
+  { id:'deprotection', name:'Deprotection', reagent:'TCA / DCM',                   desc:'TCA removes the 5′-DMT protecting group, freeing the 5′-OH for coupling.', dur:4200 },
+  { id:'wash',         name:'Wash',          reagent:'MeCN rinse',                  desc:'Acetonitrile flushes residual TCA before coupling.', dur:1600 },
+  { id:'coupling',     name:'Coupling',      reagent:'Phosphoramidite + activator', desc:'Activated phosphoramidite condenses with the 5′-OH to form a new phosphite triester.', dur:5500 },
+  { id:'wash',         name:'Wash',          reagent:'MeCN rinse',                  desc:'Solvent rinse between coupling and capping.', dur:1400 },
+  { id:'capping',      name:'Capping',       reagent:'Ac₂O / Py / THF',            desc:'Acetic anhydride caps unreacted 5′-OH groups to prevent deletion sequences.', dur:3200 },
+  { id:'wash',         name:'Wash',          reagent:'MeCN rinse',                  desc:'Column rinsed before oxidation.', dur:1400 },
+  { id:'oxidation',    name:'Oxidation',     reagent:'I₂ / H₂O / Py / THF',       desc:'Iodine oxidizes the phosphite triester to a stable phosphate (P(III) → P(V)).', dur:3200 },
+  { id:'wash',         name:'Wash',          reagent:'MeCN rinse',                  desc:'Final rinse clears iodine before the next cycle.', dur:1600 },
+];
+const MAIN_STEPS = ['deprotection','coupling','capping','oxidation'];
+const BASES = ['A','T','G','C'];
+
+// Phase fractions
+const F_FILL  = 0.30;  // liquid front descends colTop → lzBot
+const F_HOLD  = 0.40;  // fully flooded, reagent contacts resin
+const F_DRAIN = 0.30;  // level drops (lzTop rises → lzBot), exits from bottom
+
+// ── State ────────────────────────────────────────────────────────────────
+let speed    = 1.0;
+let playing  = true;
+let stepIdx  = 0;
+let elapsed  = 0;
+let lastTs   = null;
+let cycleNum = 0;
+let dnaSeq   = [];
+
+// Current liquid window (canvas y values)
+let lTop = lzTop;  // top surface of liquid
+let lBot = lzTop;  // bottom front / bottom of liquid
+
+let particles   = [];
+let inletDrops  = [];
+let outletDrops = [];
+let pTimer = 0, iTimer = 0, oTimer = 0;
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function rgba(hex, a) {
+  if (!hex || hex[0] !== '#') return `rgba(155,190,220,${a})`;
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function getColor(step) { return stepColors[step.id] || '#9bbedd'; }
+
+function getPhase() {
+  const t = Math.min(elapsed / STEPS[stepIdx].dur, 1);
+  if (t < F_FILL)           return 'fill';
+  if (t < F_FILL + F_HOLD)  return 'hold';
+  return 'drain';
+}
+
+// ── Liquid window ─────────────────────────────────────────────────────────
+// FILL:  top surface fixed at lzTop; bottom FRONT descends lzTop → lzBot
+// HOLD:  top = lzTop, bot = lzBot  (fully flooded)
+// DRAIN: top surface RISES lzTop → lzBot (level drops as liquid exits bottom)
+//        bottom stays fixed at lzBot
+function updateLiquid() {
+  const t = Math.min(elapsed / STEPS[stepIdx].dur, 1);
+  if (t < F_FILL) {
+    const p = t / F_FILL;
+    lTop = lzTop;
+    lBot = lzTop + p * lzH;
+  } else if (t < F_FILL + F_HOLD) {
+    lTop = lzTop;
+    lBot = lzBot;
+  } else {
+    const p = (t - F_FILL - F_HOLD) / F_DRAIN;
+    lTop = lzTop + p * lzH;   // surface descends (level drops)
+    lBot = lzBot;
+  }
+}
+
+function lH() { return Math.max(0, lBot - lTop); }
+
+// ── Particle / drop spawning ──────────────────────────────────────────────
+function spawnParticle() {
+  const h = lH();
+  if (h < 4) return;
+  const c = getColor(STEPS[stepIdx]);
+  particles.push({
+    x: colLeft + 4 + Math.random() * (colInnerW - 8),
+    y: lTop + Math.random() * h * 0.2,   // spawn near top surface
+    vy: 20 + Math.random() * 28,
+    r:  1 + Math.random() * 2.2,
+    alpha: 0.22 + Math.random() * 0.32,
+    color: c,
+  });
+}
+
+function spawnInletDrop() {
+  inletDrops.push({
+    y: 2, vy: 65 + Math.random()*40,
+    r: 2 + Math.random()*2, alpha: 0.78,
+    color: getColor(STEPS[stepIdx]),
+  });
+}
+
+function spawnOutletDrop() {
+  outletDrops.push({
+    y: colBot + colWall + 2, vy: 55 + Math.random()*45,
+    r: 2 + Math.random()*2.5, alpha: 0.72,
+    color: getColor(STEPS[stepIdx]),
+  });
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function drawBg() {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, CW, CH);
+  ctx.strokeStyle = 'rgba(88,166,255,0.035)';
+  ctx.lineWidth = 0.5;
+  for (let y = 0; y < CH; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+  for (let x = 0; x < CW; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); }
+}
+
+function drawInlet() {
+  const tx   = colCX;
+  const phase = getPhase();
+  const c    = getColor(STEPS[stepIdx]);
+
+  // Tube
+  ctx.strokeStyle = 'rgba(150,210,255,0.32)';
+  ctx.lineWidth = colWall; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(tx, colWall/2); ctx.lineTo(tx, colTop); ctx.stroke();
+
+  // Liquid flowing through inlet during FILL
+  if (phase === 'fill') {
+    const tf = Math.min(elapsed / STEPS[stepIdx].dur, 1) / F_FILL;
+    ctx.strokeStyle = rgba(c, 0.62 * tf);
+    ctx.lineWidth = colWall - 4;
+    ctx.beginPath(); ctx.moveTo(tx, colWall/2 + 2); ctx.lineTo(tx, colTop); ctx.stroke();
+  }
+
+  // Inlet drops
+  for (const d of inletDrops) {
+    ctx.globalAlpha = d.alpha;
+    ctx.fillStyle = d.color;
+    ctx.beginPath(); ctx.arc(tx, d.y, d.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = 'rgba(200,230,255,0.44)';
+  ctx.beginPath(); ctx.arc(tx, colTop, colWall/2, 0, Math.PI*2); ctx.fill();
+
+  ctx.fillStyle = 'rgba(88,166,255,0.38)';
+  ctx.font = '14px Share Tech Mono'; ctx.textAlign = 'right';
+  ctx.fillText('INLET', tx - colWall/2 - 3, 10);
+}
+
+function drawOutlet() {
+  const tx    = colCX;
+  const tTop  = colBot + colWall;
+  const tBot  = CH - 5;
+  const phase = getPhase();
+  const c     = getColor(STEPS[stepIdx]);
+
+  ctx.strokeStyle = 'rgba(150,210,255,0.32)';
+  ctx.lineWidth = colWall; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(tx, tTop); ctx.lineTo(tx, tBot - colWall/2); ctx.stroke();
+
+  // Eluent visible during DRAIN
+  if (phase === 'drain') {
+    const p = (Math.min(elapsed / STEPS[stepIdx].dur, 1) - F_FILL - F_HOLD) / F_DRAIN;
+    ctx.strokeStyle = rgba(c, 0.58 * Math.min(p * 2, 1));
+    ctx.lineWidth = colWall - 4;
+    ctx.beginPath(); ctx.moveTo(tx, tTop); ctx.lineTo(tx, tBot - colWall/2 - 2); ctx.stroke();
+  }
+
+  // Outlet drops
+  for (const d of outletDrops) {
+    ctx.globalAlpha = d.alpha;
+    ctx.fillStyle = d.color;
+    ctx.beginPath(); ctx.arc(tx, d.y, d.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = 'rgba(88,166,255,0.38)';
+  ctx.font = '14px Share Tech Mono'; ctx.textAlign = 'left';
+  ctx.fillText('OUTLET', tx + colWall/2 + 3, CH - 8);
+}
+
+function drawColumn() {
+  const lx = colLeft - colWall, rx = colRight + colWall;
+  const step = STEPS[stepIdx];
+  const c  = getColor(step);
+  const h  = lH();
+
+  // Dark interior
+  ctx.fillStyle = 'rgba(6,13,26,0.93)';
+  ctx.fillRect(lx + colWall, colTop, colInnerW, colH);
+
+  // ── Liquid ────────────────────────────────────────────────────────────
+  if (h > 0.5) {
+    const grad = ctx.createLinearGradient(colLeft, 0, colRight, 0);
+    grad.addColorStop(0,    rgba(c, 0.08));
+    grad.addColorStop(0.18, rgba(c, 0.52));
+    grad.addColorStop(0.82, rgba(c, 0.52));
+    grad.addColorStop(1,    rgba(c, 0.08));
+    ctx.fillStyle = grad;
+    ctx.fillRect(colLeft, lTop, colInnerW, h);
+
+    // Glow
+    ctx.save();
+    ctx.shadowColor = c; ctx.shadowBlur = 16;
+    ctx.fillStyle = rgba(c, 0.06);
+    ctx.fillRect(colLeft, lTop, colInnerW, h);
+    ctx.restore();
+
+    // Phase wavefront
+    const phase = getPhase();
+    if (phase === 'fill') {
+      // Bright leading edge at lBot descending
+      const wg = ctx.createLinearGradient(0, lBot - 8, 0, lBot + 3);
+      wg.addColorStop(0, rgba(c, 0));
+      wg.addColorStop(1, rgba(c, 0.90));
+      ctx.fillStyle = wg;
+      ctx.fillRect(colLeft, lBot - 8, colInnerW, 11);
+    } else if (phase === 'drain') {
+      // Receding top surface at lTop rising (surface drops toward bottom)
+      const wg = ctx.createLinearGradient(0, lTop - 3, 0, lTop + 8);
+      wg.addColorStop(0, rgba(c, 0.88));
+      wg.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = wg;
+      ctx.fillRect(colLeft, lTop - 3, colInnerW, 11);
+    } else {
+      // Hold — gentle shimmer at top surface
+      const wg = ctx.createLinearGradient(0, lTop, 0, lTop + 5);
+      wg.addColorStop(0, rgba(c, 0.55));
+      wg.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = wg;
+      ctx.fillRect(colLeft, lTop, colInnerW, 5);
+    }
+  }
+
+  // ── Frit ──────────────────────────────────────────────────────────────
+  ctx.fillStyle = 'rgba(100,145,195,0.20)';
+  ctx.fillRect(colLeft, lzBot, colInnerW, fritH);
+  ctx.fillStyle = 'rgba(150,200,255,0.12)';
+  for (let fx = colLeft + 4; fx < colRight - 3; fx += 6)
+    for (let fy = lzBot + 3; fy < colBot - 2; fy += 6) {
+      ctx.beginPath(); ctx.arc(fx, fy, 1.8, 0, Math.PI*2); ctx.fill();
+    }
+
+  // ── Resin beads ───────────────────────────────────────────────────────
+  const bY = lzBot - beadH;
+  for (let bx = colLeft + 5; bx < colRight - 5; bx += 9)
+    for (let by = bY; by < lzBot - 2; by += 9) {
+      const jx = Math.sin(bx * 1.3 + by) * 2;
+      const jy = Math.cos(bx + by * 0.9) * 1.5;
+      ctx.fillStyle = 'rgba(175,210,255,0.30)';
+      ctx.beginPath(); ctx.arc(bx+jx, by+jy, 3.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.09)';
+      ctx.beginPath(); ctx.arc(bx+jx-0.8, by+jy-0.8, 1.2, 0, Math.PI*2); ctx.fill();
+    }
+
+  // ── Nucleotide dots ───────────────────────────────────────────────────
+  const baseColors = { A:'#FF6B6B', T:'#4FC3F7', G:'#3DD68C', C:'#FFD93D' };
+  const visible = Math.min(dnaSeq.length, 7);
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < visible; i++) {
+    const bc = baseColors[dnaSeq[dnaSeq.length - 1 - i]] || '#fff';
+    const bx2 = colLeft + 7 + i * 8.5;
+    const by2 = lzBot - 8;
+    ctx.fillStyle = bc; ctx.shadowColor = bc; ctx.shadowBlur = 7;
+    ctx.beginPath(); ctx.arc(bx2, by2, 2.8, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // ── Particles ─────────────────────────────────────────────────────────
+  for (const p of particles) {
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Glass walls ───────────────────────────────────────────────────────
+  ctx.strokeStyle = 'rgba(140,200,255,0.50)';
+  ctx.lineWidth = colWall; ctx.lineJoin = 'round';
+  ctx.strokeRect(lx + colWall/2, colTop + colWall/2, rx - lx - colWall, colH - colWall);
+
+  // Shine strip
+  const shine = ctx.createLinearGradient(lx, 0, lx + 13, 0);
+  shine.addColorStop(0, 'rgba(255,255,255,0.19)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  ctx.fillRect(lx + colWall, colTop + colWall, 8, colH - colWall * 2);
+}
+
+function drawLabels() {
+  const step  = STEPS[stepIdx];
+  const c     = getColor(step);
+  const phase = getPhase();
+
+  // Ruler ticks
+  const rx2 = colRight + colWall + 6;
+  ctx.strokeStyle = 'rgba(88,166,255,0.15)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const ry = lzTop + (lzH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(rx2, ry); ctx.lineTo(rx2 + 5, ry); ctx.stroke();
+    ctx.fillStyle = 'rgba(88,166,255,0.20)'; ctx.font = '12px Share Tech Mono'; ctx.textAlign = 'left';
+    ctx.fillText(`${100 - 25*i}%`, rx2 + 7, ry + 3);
+  }
+
+  // Liquid-surface marker
+  if (lH() > 3) {
+    ctx.strokeStyle = rgba(c, 0.52); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(rx2 + 3, lTop); ctx.lineTo(rx2 + 18, lTop); ctx.stroke();
+    ctx.fillStyle = rgba(c, 0.52);
+    ctx.beginPath(); ctx.moveTo(rx2 + 3, lTop); ctx.lineTo(rx2 + 8, lTop - 3); ctx.lineTo(rx2 + 8, lTop + 3); ctx.fill();
+  }
+
+  // Phase label inside column (near resin)
+  const label = phase === 'fill' ? '▼ FILLING' : phase === 'drain' ? '▼ DRAINING' : '◼ CONTACT';
+  ctx.fillStyle = rgba(c, 0.48); ctx.font = '14px Share Tech Mono'; ctx.textAlign = 'left';
+  ctx.fillText(label, colLeft - colWall + 1, lzBot - beadH - 5);
+}
+
+// ── UI update ─────────────────────────────────────────────────────────────
+function updateUI() {
+  const step = STEPS[stepIdx];
+  const c    = getColor(step);
+  const pct  = Math.min(elapsed / step.dur, 1) * 100;
+
+  document.getElementById('step-name-text').textContent = step.name;
+  const dot = document.getElementById('step-color-dot');
+  dot.style.background = c; dot.style.boxShadow = `0 0 7px ${c}`;
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('progress-bar-fill').style.background = c;
+  document.getElementById('cycle-count').textContent  = cycleNum;
+  document.getElementById('dna-sequence').textContent = dnaSeq.length ? "5'–"+dnaSeq.join('')+"–3'" : '—';
+
+  MAIN_STEPS.forEach(id => {
+    const el = document.getElementById('cs-' + id);
+    const active = step.id === id;
+    el.classList.toggle('active', active);
+    el.style.borderColor = active ? c+'88' : '';
+    el.style.background  = active ? c+'18' : '';
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────
+function tick(ts) {
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0.016;
+  lastTs = ts;
+
+  if (playing) {
+    elapsed += dt * speed * 1000;
+    updateLiquid();
+    const phase = getPhase();
+    const h     = lH();
+
+    // Inlet drops — fall down the tube during FILL
+    iTimer -= dt * speed;
+    if (iTimer <= 0 && phase === 'fill') { spawnInletDrop(); iTimer = 0.10 + Math.random()*0.12; }
+    inletDrops = inletDrops.filter(d => {
+      d.y += d.vy * dt * speed;
+      d.alpha -= 0.014 * speed;
+      return d.alpha > 0.01 && d.y < lBot + 2;   // vanish when they reach the descending front
+    });
+
+    // Particles — born at lTop, drift DOWN through liquid
+    pTimer -= dt * speed;
+    if (pTimer <= 0 && h > 6) { spawnParticle(); pTimer = 0.07 + Math.random()*0.10; }
+    particles = particles.filter(p => {
+      p.y     += p.vy * dt * speed;
+      p.alpha -= 0.003 * speed;
+      return p.alpha > 0.01 && p.y < lBot;
+    });
+
+    // Outlet drops — exit at bottom during DRAIN
+    oTimer -= dt * speed;
+    if (oTimer <= 0 && phase === 'drain') { spawnOutletDrop(); oTimer = 0.13 + Math.random()*0.16; }
+    outletDrops = outletDrops.filter(d => {
+      d.y    += d.vy * dt * speed;
+      d.vy   += 120 * dt;
+      d.alpha -= 0.025 * speed;
+      return d.alpha > 0.01 && d.y < CH;
+    });
+
+    // Advance step
+    if (elapsed >= STEPS[stepIdx].dur) {
+      elapsed -= STEPS[stepIdx].dur;
+      lTop = lzTop; lBot = lzTop;
+      particles = []; inletDrops = []; outletDrops = [];
+      stepIdx = (stepIdx + 1) % STEPS.length;
+      if (stepIdx === 0) {
+        cycleNum++;
+        dnaSeq.push(BASES[Math.floor(Math.random() * 4)]);
+        if (dnaSeq.length > 30) dnaSeq = dnaSeq.slice(-30);
+      }
+    }
+
+    updateUI();
+  }
+
+  drawBg();
+  drawInlet();
+  drawOutlet();
+  drawColumn();
+  drawLabels();
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// ── Controls ──────────────────────────────────────────────────────────────
+document.getElementById('speed-slider').addEventListener('input', function() {
+  speed = parseFloat(this.value);
+  document.getElementById('speed-val').textContent = speed.toFixed(1) + '×';
+});
+document.getElementById('play-btn').addEventListener('click', function() {
+  playing = !playing;
+  this.textContent = playing ? '⏸ Pause' : '▶ Play';
+  this.classList.toggle('active', playing);
+  if (playing) lastTs = null;
+});
+document.getElementById('reset-btn').addEventListener('click', function() {
+  stepIdx = 0; elapsed = 0;
+  lTop = lzTop; lBot = lzTop;
+  particles = []; inletDrops = []; outletDrops = [];
+  cycleNum = 0; dnaSeq = [];
+  lastTs = null; updateUI();
+});
+['deprotection','coupling','capping','oxidation'].forEach(id => {
+  document.getElementById('col-' + id).addEventListener('input', function() {
+    stepColors[id] = this.value;
+    const dot = document.querySelector(`#cs-${id} .cs-dot`);
+    if (dot) dot.style.background = this.value;
+  });
+});
+</script>
+</body>
+</html>
