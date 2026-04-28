@@ -319,8 +319,8 @@
 <body>
 
 <header>
-  <h1>DNA Elongation</h1>
-  <p>Robotic Assembly · 5′ → 3′ Synthesis · ssDNA</p>
+  <h1>Nanorobotic DNA synthesis</h1>
+  <p>Error Correction and Quality Control During Synthesis</p>
 </header>
 
 <div id="hud-top">
@@ -771,21 +771,6 @@ function drawBackground(t) {
   ctx.textAlign = 'right';
   ctx.fillText('SYNTHESIS ACTIVE', W - 10, H - 8);
 
-  // ── Blinking REC indicator ────────────────────────────────────────────────
-  if (Math.floor(t / 600) % 2 === 0) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(W - 86, H - 13, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff2244';
-    if (cfg.glowOn) { ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 10; }
-    ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = 'rgba(255,34,68,0.7)';
-    ctx.font = "10px 'Share Tech Mono', monospace";
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('● REC', W - 74, H - 8);
-  }
 }
 
 function drawStrand() {
